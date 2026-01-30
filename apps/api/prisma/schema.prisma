@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Market {
+  id              String    @id @default(cuid())
+  conditionId     String?   @unique  // Polymarket condition ID (0x...) for trade lookups
+  question        String
+  category        String?
+  createdAt       DateTime  @default(now())
+  closesAt        DateTime
+  resolvesAt      DateTime?
+  status          String    @default("open")
+  oracleRequestAt DateTime?
+  metaJson        Json?
+
+  bets            Bet[]
+  newsEvents      NewsEvent[]
+  featureSnapshots FeatureSnapshot[]
+  scores          Score[]
+
+  @@index([status])
+  @@index([closesAt])
+  @@index([conditionId])
+}
+
+model Bet {
+  id                  String   @id @default(cuid())
+  txHash              String   @unique
+  marketId            String
+  wallet              String
+  outcomeId           String
+  timestamp           DateTime
+  blockNumber         Int
+  betUsd              Decimal  @db.Decimal(24, 8)
+  impliedBefore       Float
+  impliedAfter        Float
+  deltaProb           Float
+  fractionOfPool      Float
+  zScoreSize          Float
+  gasPriorityFlag     Boolean
+  timeToResolutionSec Int
+
+  market          Market            @relation(fields: [marketId], references: [id])
+  featureSnapshot FeatureSnapshot?
+  score           Score?
+
+  @@index([marketId])
+  @@index([wallet])
+  @@index([timestamp])
+}
+
+model Wallet {
+  address         String   @id
+  firstSeenAt     DateTime @default(now())
+  lastSeenAt      DateTime @default(now())
+  newWalletFlag   Boolean  @default(false)
+  roi30d          Float    @default(0)
+  winRateRolling  Float    @default(0)
+
+  @@index([newWalletFlag])
+}
+
+model FeatureSnapshot {
+  id        String   @id @default(cuid())
+  betId     String   @unique
+  wallet    String
+  marketId  String
+  features  Json
+  createdAt DateTime @default(now())
+
+  bet    Bet    @relation(fields: [betId], references: [id])
+  market Market @relation(fields: [marketId], references: [id])
+
+  @@index([wallet])
+  @@index([marketId])
+  @@index([createdAt])
+}
+
+model Score {
+  id         String   @id @default(cuid())
+  betId      String   @unique
+  wallet     String
+  marketId   String
+  irsBet     Int
+  irsWallet  Int
+  irsCluster Int
+  createdAt  DateTime @default(now())
+
+  bet    Bet    @relation(fields: [betId], references: [id])
+  market Market @relation(fields: [marketId], references: [id])
+
+  @@index([wallet])
+  @@index([marketId])
+  @@index([irsBet])
+  @@index([createdAt])
+}
+
+model Cluster {
+  id        String   @id @default(cuid())
+  members   Json
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model NewsEvent {
+  id          String   @id @default(cuid())
+  marketId    String?
+  source      String
+  headline    String
+  url         String
+  timestamp   DateTime
+  volumeScore Float    @default(0)
+  matchScore  Float    @default(0)
+
+  market Market? @relation(fields: [marketId], references: [id])
+
+  @@index([marketId])
+  @@index([timestamp])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  type      String
+  refId     String?
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([refId])
+  @@index([createdAt])
+}
+
+model Evidence {
+  id         String   @id @default(cuid())
+  betId      String   @unique
+  wallet     String
+  marketId   String
+  irs        Int
+  components Json
+  chips      Json
+  createdAt  DateTime @default(now())
+
+  @@index([wallet])
+  @@index([marketId])
+  @@index([irs])
+  @@index([createdAt])
+}
+
+
+model Config {
+  key        String   @id
+  value      Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
